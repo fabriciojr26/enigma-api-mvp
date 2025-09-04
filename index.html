@@ -1,259 +1,385 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Controlo - Enigma API</title>
+    <title>Enigma Loto - Estratégia Inteligente</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f3f4f6;
         }
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        .number-grid-item {
-            transition: all 0.2s ease-in-out;
+        .number-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0.75rem;
         }
-        .number-grid-item.fixed {
+        .number-btn {
+            transition: all 0.2s ease-in-out;
+            border: 2px solid transparent;
+        }
+        .number-btn.selected-fixed {
             background-color: #3b82f6 !important;
             color: white !important;
-            border-color: #2563eb !important;
+            border-color: #2563eb;
+            font-weight: 600;
         }
-        .number-grid-item.excluded {
+        .number-btn.selected-excluded {
             background-color: #ef4444 !important;
             color: white !important;
-            border-color: #dc2626 !important;
+            border-color: #dc2626;
+            font-weight: 600;
+        }
+        .result-card {
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .result-number {
+            width: 2.25rem;
+            height: 2.25rem;
         }
         .result-number.fixed {
             background-color: #3b82f6;
             color: white;
+        }
+        /* Estilos para o Conferidor */
+        .checker-number-btn.selected {
+            background-color: #10b981 !important;
+            color: white !important;
+            border-color: #059669;
+        }
+        .checked-result-number.match {
+            background-color: #10b981;
+            color: white;
+            font-weight: 700;
+        }
+        .prize-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .prize-15 { background-color: #f59e0b; color: white; }
+        .prize-14 { background-color: #8b5cf6; color: white; }
+        .prize-13 { background-color: #3b82f6; color: white; }
+        .prize-12 { background-color: #10b981; color: white; }
+        .prize-11 { background-color: #6b7280; color: white; }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
-<body class="p-4 sm:p-6 md:p-8">
-    <div class="max-w-7xl mx-auto">
-        <header class="text-center mb-8">
-            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Painel de Controlo da API Enigma</h1>
-            <p class="text-md text-gray-500 mt-2">Uma interface intuitiva para gerar combinações otimizadas.</p>
+<body class="antialiased text-gray-800">
+
+    <div class="container mx-auto px-4 py-8 md:py-12">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-900">Enigma Loto</h1>
+            <p class="mt-3 text-lg text-gray-600">Sua estratégia inteligente para a Lotofácil.</p>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Coluna de Configurações -->
-            <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg">
-                <h2 class="text-2xl font-semibold text-gray-700 mb-6">Configurações</h2>
+            <aside class="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-200 self-start">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-semibold mb-4 text-gray-800">1. Defina sua Estratégia</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="quantity" class="block text-sm font-medium text-gray-700 mb-1">Quantos jogos você quer criar?</label>
+                            <input type="number" id="quantity" value="10" min="1" max="100" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="tail_target" class="block text-sm font-medium text-gray-700 mb-1">Qual seu objetivo de acertos?</label>
+                            <select id="tail_target" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                <option value="11">11 Pontos</option>
+                                <option value="12">12 Pontos</option>
+                                <option value="13" selected>13 Pontos</option>
+                                <option value="14">14 Pontos</option>
+                                <option value="15">15 Pontos</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="text-2xl font-semibold mb-4 text-gray-800">2. Escolha suas Dezenas</h2>
+                    <p class="text-sm text-gray-600 mb-4">Selecione suas dezenas da sorte (Fixas) ou aquelas que você quer evitar (Excluídas).</p>
+                    <div class="flex items-center space-x-4 mb-4">
+                        <div class="flex items-center">
+                            <input type="radio" id="fixed-radio" name="selection-mode" value="fixed" checked class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                            <label for="fixed-radio" class="ml-2 block text-sm font-medium text-gray-700">Fixo</label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="radio" id="excluded-radio" name="selection-mode" value="excluded" class="h-4 w-4 text-red-600 border-gray-300 focus:ring-red-500">
+                            <label for="excluded-radio" class="ml-2 block text-sm font-medium text-gray-700">Excluído</label>
+                        </div>
+                    </div>
+                    <div id="number-grid" class="number-grid"></div>
+                </div>
+
+                <div class="mt-8">
+                    <button id="generate-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-transform transform hover:scale-105">
+                        3. Gerar Meus Jogos!
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Coluna de Resultados e Conferidor -->
+            <section class="lg:col-span-2 space-y-8">
+                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 min-h-[300px] flex flex-col">
+                    <h2 class="text-2xl font-semibold mb-4 text-gray-800">Seus Jogos Otimizados</h2>
+                    <div id="results-container" class="flex-grow">
+                        <div id="results-placeholder" class="h-full flex items-center justify-center">
+                            <p class="text-gray-500 text-center">Seus jogos aparecerão aqui após a geração.</p>
+                        </div>
+                    </div>
+                </div>
                 
-                <div class="space-y-4">
-                    <div>
-                        <label for="quantity" class="block text-sm font-medium text-gray-600">Quantidade de Bilhetes</label>
-                        <input type="number" id="quantity" value="10" min="1" max="100" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 px-3">
-                    </div>
-                    <div>
-                        <label for="tail_target" class="block text-sm font-medium text-gray-600">Alvo de Acertos (k)</label>
-                        <select id="tail_target" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 px-2">
-                            <option value="11">11</option>
-                            <option value="12">12</option>
-                            <option selected value="13">13</option>
-                            <option value="14">14</option>
-                            <option value="15">15</option>
-                        </select>
-                    </div>
+                <!-- Secção do Conferidor (inicialmente escondida) -->
+                <div id="checker-section" class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hidden">
+                    <h2 class="text-2xl font-semibold mb-2 text-gray-800">4. Confira seus Resultados</h2>
+                    <p class="text-sm text-gray-600 mb-4">Selecione as 15 dezenas do sorteio oficial para conferir seus jogos.</p>
+                    <div id="checker-number-grid" class="number-grid mb-4"></div>
+                    <p id="checker-feedback" class="text-sm text-center text-gray-500 mb-4 h-5"></p>
+                    <button id="check-btn" class="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-transform transform hover:scale-105" disabled>
+                        Conferir Resultados
+                    </button>
+                    <div id="checked-results-container" class="mt-6"></div>
                 </div>
+            </section>
+        </main>
 
-                <h3 class="text-xl font-semibold text-gray-700 mt-8 mb-4">Seleção de Números</h3>
-                <p class="text-sm text-gray-500 mb-3">Clique num número para o fixar. Clique novamente para o excluir. Um terceiro clique limpa a seleção.</p>
-                <div class="flex items-center space-x-4 mb-4">
-                    <div class="flex items-center">
-                        <span class="w-4 h-4 rounded-full bg-blue-500 mr-2"></span>
-                        <span class="text-sm text-gray-600">Fixo</span>
-                    </div>
-                    <div class="flex items-center">
-                        <span class="w-4 h-4 rounded-full bg-red-500 mr-2"></span>
-                        <span class="text-sm text-gray-600">Excluído</span>
-                    </div>
-                </div>
-
-                <div id="number-grid" class="grid grid-cols-5 gap-2">
-                    <!-- Números serão inseridos aqui via JS -->
-                </div>
-
-                <button id="generate-btn" class="mt-8 w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-transform transform hover:scale-105">
-                    Gerar Bilhetes
-                </button>
-            </div>
-
-            <!-- Coluna de Resultados -->
-            <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-lg">
-                <h2 class="text-2xl font-semibold text-gray-700 mb-6">Resultados da Geração</h2>
-                <div id="results-area">
-                    <div id="placeholder" class="text-center py-16 px-6 border-2 border-dashed border-gray-300 rounded-lg">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <h3 class="mt-2 text-sm font-medium text-gray-900">Nenhum resultado gerado</h3>
-                        <p class="mt-1 text-sm text-gray-500">Ajuste as configurações e clique em "Gerar Bilhetes" para começar.</p>
-                    </div>
-                    <div id="loading" class="hidden text-center py-16 px-6">
-                        <svg class="animate-spin mx-auto h-10 w-10 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <p class="mt-4 text-sm font-medium text-gray-700">A gerar combinações... Por favor, aguarde.</p>
-                        <p class="mt-1 text-xs text-gray-500">O primeiro arranque pode demorar até 50 segundos.</p>
-                    </div>
-                    <div id="error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative" role="alert">
-                        <strong class="font-bold">Erro!</strong>
-                        <span class="block sm:inline" id="error-message"></span>
-                    </div>
-                    <div id="results-content" class="hidden">
-                        <!-- Conteúdo dos resultados será inserido aqui -->
-                    </div>
-                </div>
-            </div>
-        </div>
+        <footer class="text-center mt-12 text-sm text-gray-500">
+            <p>&copy; 2025 Enigma Loto | Análise Inteligente para a Lotofácil.</p>
+        </footer>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // ########## URL DA API ##########
-            // A linha abaixo conecta o seu painel de controlo (frontend) à sua API (backend).
-            const apiUrl = 'https://enigma-api-mvp.onrender.com';
-            // ################################
+        // Variáveis globais
+        let generatedGames = [];
+        let officialResult = [];
+        const apiUrl = 'https://enigma-api-mvp.onrender.com';
 
-            const numberGrid = document.getElementById('number-grid');
-            const generateBtn = document.getElementById('generate-btn');
-            const quantityInput = document.getElementById('quantity');
-            const tailTargetInput = document.getElementById('tail_target');
-            
-            const resultsArea = document.getElementById('results-area');
-            const placeholder = document.getElementById('placeholder');
-            const loading = document.getElementById('loading');
-            const error = document.getElementById('error');
-            const errorMessage = document.getElementById('error-message');
-            const resultsContent = document.getElementById('results-content');
+        // Elementos do DOM
+        const numberGrid = document.getElementById('number-grid');
+        const generateBtn = document.getElementById('generate-btn');
+        const resultsContainer = document.getElementById('results-container');
+        const checkerSection = document.getElementById('checker-section');
+        const checkerGrid = document.getElementById('checker-number-grid');
+        const checkerFeedback = document.getElementById('checker-feedback');
+        const checkBtn = document.getElementById('check-btn');
+        const checkedResultsContainer = document.getElementById('checked-results-container');
+        
+        let selectedNumbers = { fixed: [], excluded: [] };
 
-            const numberStates = {}; // 0: normal, 1: fixed, 2: excluded
-
-            // Gerar a grelha de números
+        // --- LÓGICA DE GERAÇÃO ---
+        function initializeGeneratorGrid() {
             for (let i = 1; i <= 25; i++) {
-                const numberEl = document.createElement('button');
-                numberEl.textContent = i;
-                numberEl.classList.add('number-grid-item', 'w-full', 'h-12', 'flex', 'items-center', 'justify-center', 'text-sm', 'font-medium', 'text-gray-700', 'bg-gray-100', 'border', 'border-gray-300', 'rounded-md', 'hover:bg-gray-200');
-                numberEl.dataset.number = i;
-                numberStates[i] = 0;
+                const button = document.createElement('button');
+                button.textContent = i;
+                button.value = i;
+                button.className = 'number-btn bg-gray-100 hover:bg-gray-200 p-2 rounded-md font-medium text-gray-700';
+                button.addEventListener('click', () => toggleNumberSelection(button));
+                numberGrid.appendChild(button);
+            }
+        }
 
-                numberEl.addEventListener('click', () => {
-                    numberStates[i] = (numberStates[i] + 1) % 3;
-                    updateNumberAppearance(numberEl, numberStates[i]);
+        function toggleNumberSelection(button) {
+            const number = parseInt(button.value);
+            const mode = document.querySelector('input[name="selection-mode"]:checked').value;
+            const isFixed = button.classList.contains('selected-fixed');
+            const isExcluded = button.classList.contains('selected-excluded');
+
+            // Limpa qualquer seleção anterior do número
+            button.classList.remove('selected-fixed', 'selected-excluded');
+            selectedNumbers.fixed = selectedNumbers.fixed.filter(n => n !== number);
+            selectedNumbers.excluded = selectedNumbers.excluded.filter(n => n !== number);
+            
+            // Adiciona nova seleção se não era a seleção ativa
+            if (mode === 'fixed' && !isFixed) {
+                button.classList.add('selected-fixed');
+                selectedNumbers.fixed.push(number);
+            } else if (mode === 'excluded' && !isExcluded) {
+                button.classList.add('selected-excluded');
+                selectedNumbers.excluded.push(number);
+            }
+        }
+
+        async function generateTickets() {
+            const quantity = parseInt(document.getElementById('quantity').value);
+            const tail_target = parseInt(document.getElementById('tail_target').value);
+            
+            const requestBody = {
+                quantity: quantity,
+                objective: "TAIL",
+                tail_target: tail_target,
+                advanced: {
+                    fixed_numbers: selectedNumbers.fixed.length > 0 ? selectedNumbers.fixed : null,
+                    excluded_numbers: selectedNumbers.excluded.length > 0 ? selectedNumbers.excluded : null
+                }
+            };
+            
+            resultsContainer.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-center"><div class="loader mb-4"></div><p class="text-gray-600 font-medium">Analisando as probabilidades e construindo seus jogos...</p><p class="text-sm text-gray-500">Isso pode levar alguns segundos.</p></div>`;
+            generateBtn.disabled = true;
+            generateBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            checkerSection.classList.add('hidden');
+            checkedResultsContainer.innerHTML = '';
+
+            try {
+                const response = await fetch(`${apiUrl}/api/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
                 });
-
-                numberGrid.appendChild(numberEl);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                generatedGames = data.games; // Salva os jogos para o conferidor
+                displayResults(data);
+                checkerSection.classList.remove('hidden'); // Mostra o conferidor
+            } catch (error) {
+                console.error('Fetch error:', error);
+                resultsContainer.innerHTML = `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative" role="alert"><strong class="font-bold">Erro de Conexão:</strong><span class="block sm:inline">Não foi possível comunicar com o servidor. O servidor pode estar a "acordar". Por favor, tente novamente em alguns segundos.</span></div>`;
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             }
+        }
+        
+        function displayResults(data) {
+            resultsContainer.innerHTML = ''; 
+            const meta = data.meta;
+            const metaCard = `<div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6 flex justify-around text-center"><div><p class="text-sm text-gray-500">Run ID</p><p class="font-semibold text-gray-800 text-xs">${data.run_id.split('-')[1]}</p></div><div><p class="text-sm text-gray-500">Versão</p><p class="font-semibold text-gray-800">${data.engine_version.replace('-calib-stress-auto', '')}</p></div><div><p class="text-sm text-gray-500">Objetivo</p><p class="font-semibold text-gray-800">${data.objective_used}</p></div><div><p class="text-sm text-gray-500">P(Acerto >= ${data.k_tail})</p><p class="font-semibold text-green-600">${meta.p_success_ge_k ? meta.p_success_ge_k.toFixed(4) : 'N/A'}</p></div></div>`;
+            resultsContainer.insertAdjacentHTML('beforeend', metaCard);
+            const gamesGridEl = document.createElement('div');
+            gamesGridEl.className = 'space-y-3';
+            data.games.forEach(game => {
+                const gameCard = document.createElement('div');
+                gameCard.className = 'result-card bg-white p-3 rounded-lg flex items-center space-x-4 border border-gray-200';
+                const gameId = `<div class="text-sm font-bold text-gray-500">#${String(game.id).padStart(2, '0')}</div>`;
+                const numbersHtml = game.numbers.map(num => `<div class="result-number flex items-center justify-center rounded-full text-sm font-semibold ${selectedNumbers.fixed.includes(num) ? 'fixed' : 'bg-gray-100 text-gray-800'}">${num}</div>`).join('');
+                gameCard.innerHTML = `${gameId}<div class="flex flex-wrap gap-2">${numbersHtml}</div>`;
+                gamesGridEl.appendChild(gameCard);
+            });
+            resultsContainer.appendChild(gamesGridEl);
+        }
 
-            function updateNumberAppearance(element, state) {
-                element.classList.remove('fixed', 'excluded');
-                if (state === 1) {
-                    element.classList.add('fixed');
-                } else if (state === 2) {
-                    element.classList.add('excluded');
+        // --- LÓGICA DO CONFERIDOR ---
+        function initializeCheckerGrid() {
+            for (let i = 1; i <= 25; i++) {
+                const button = document.createElement('button');
+                button.textContent = i;
+                button.value = i;
+                button.className = 'checker-number-btn number-btn bg-gray-100 hover:bg-gray-200 p-2 rounded-md font-medium text-gray-700';
+                button.addEventListener('click', () => toggleCheckerNumber(button));
+                checkerGrid.appendChild(button);
+            }
+        }
+
+        function toggleCheckerNumber(button) {
+            const number = parseInt(button.value);
+            if (officialResult.includes(number)) {
+                officialResult = officialResult.filter(n => n !== number);
+                button.classList.remove('selected');
+            } else {
+                if (officialResult.length < 15) {
+                    officialResult.push(number);
+                    button.classList.add('selected');
                 }
             }
+            updateCheckerFeedback();
+        }
 
-            generateBtn.addEventListener('click', async () => {
-                const fixed_numbers = Object.keys(numberStates).filter(n => numberStates[n] === 1).map(Number);
-                const excluded_numbers = Object.keys(numberStates).filter(n => numberStates[n] === 2).map(Number);
+        function updateCheckerFeedback() {
+            const count = officialResult.length;
+            if (count < 15) {
+                checkerFeedback.textContent = `Selecione mais ${15 - count} dezenas.`;
+                checkBtn.disabled = true;
+                checkBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                checkerFeedback.textContent = `Pronto para conferir!`;
+                checkBtn.disabled = false;
+                checkBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
 
-                const requestBody = {
-                    quantity: parseInt(quantityInput.value),
-                    objective: "TAIL",
-                    tail_target: parseInt(tailTargetInput.value),
-                    advanced: {
-                        fixed_numbers: fixed_numbers.length > 0 ? fixed_numbers : null,
-                        excluded_numbers: excluded_numbers.length > 0 ? excluded_numbers : null
-                    }
-                };
+        function checkGames() {
+            if (officialResult.length !== 15) return;
 
-                // Mostrar loading e esconder outros estados
-                placeholder.classList.add('hidden');
-                error.classList.add('hidden');
-                resultsContent.classList.add('hidden');
-                loading.classList.remove('hidden');
-
-                try {
-                    const response = await fetch(`${apiUrl}/api/generate`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(requestBody),
-                    });
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    displayResults(data, fixed_numbers);
-
-                } catch (e) {
-                    showError(`Ocorreu um problema ao comunicar com o servidor. Verifique a consola (F12) para mais detalhes. Erro: ${e.message}`);
-                } finally {
-                    loading.classList.add('hidden');
-                }
+            const checked = generatedGames.map(game => {
+                const hits = game.numbers.filter(num => officialResult.includes(num)).length;
+                return { ...game, hits };
             });
 
-            function displayResults(data, fixed_numbers = []) {
-                resultsContent.innerHTML = ''; // Limpar resultados anteriores
-                
-                const metaHtml = `
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 bg-gray-50 p-4 rounded-lg border">
-                        <div>
-                            <p class="text-xs text-gray-500">Run ID</p>
-                            <p class="text-sm font-semibold text-gray-800 truncate" title="${data.run_id}">${data.run_id}</p>
-                        </div>
-                        <div>
-                            <p class="text-xs text-gray-500">Versão</p>
-                            <p class="text-sm font-semibold text-gray-800">${data.engine_version}</p>
-                        </div>
-                        <div>
-                            <p class="text-xs text-gray-500">Objetivo</p>
-                            <p class="text-sm font-semibold text-gray-800">${data.objective_used}</p>
-                        </div>
-                        <div>
-                            <p class="text-xs text-gray-500">P(Acerto >= ${data.k_tail})</p>
-                            <p class="text-sm font-semibold text-green-600">${(data.meta.p_success_ge_k || 0).toFixed(4)}</p>
-                        </div>
-                    </div>
-                `;
-                resultsContent.innerHTML += metaHtml;
+            checked.sort((a, b) => b.hits - a.hits); // Ordena por acertos (decrescente)
+            displayCheckedResults(checked);
+        }
 
-                const gamesHtml = `
-                    <div class="space-y-3">
-                        ${data.games.map(game => `
-                            <div class="flex items-center bg-white border border-gray-200 rounded-lg p-3">
-                                <span class="text-sm font-bold text-gray-600 w-8">#${String(game.id).padStart(2, '0')}</span>
-                                <div class="flex-1 grid grid-cols-5 sm:grid-cols-8 md:grid-cols-15 gap-1.5 ml-4">
-                                    ${game.numbers.map(num => `
-                                        <div class="result-number ${fixed_numbers.includes(num) ? 'fixed' : ''} w-8 h-8 flex items-center justify-center text-sm font-medium bg-gray-100 rounded-full">
-                                            ${num}
-                                        </div>
-                                    `).join('')}
-                                </div>
+        function displayCheckedResults(checkedGames) {
+            checkedResultsContainer.innerHTML = `<h3 class="text-xl font-semibold mb-4 text-gray-800">Resultado da Conferência</h3>`;
+            const gamesList = document.createElement('div');
+            gamesList.className = 'space-y-3';
+
+            if (checkedGames.length === 0) {
+                gamesList.innerHTML = `<p class="text-gray-500">Nenhum jogo para conferir.</p>`;
+            } else {
+                 checkedGames.forEach(game => {
+                    const gameCard = document.createElement('div');
+                    gameCard.className = 'result-card bg-white p-3 rounded-lg flex items-center justify-between space-x-4 border border-gray-200';
+                    
+                    const gameInfo = `
+                        <div class="flex items-center space-x-4">
+                            <div class="text-sm font-bold text-gray-500">#${String(game.id).padStart(2, '0')}</div>
+                            <div class="flex flex-wrap gap-2">
+                                ${game.numbers.map(num => `
+                                    <div class="checked-result-number result-number flex items-center justify-center rounded-full text-sm font-semibold ${officialResult.includes(num) ? 'match' : 'bg-gray-100 text-gray-800'}">
+                                        ${num}
+                                    </div>
+                                `).join('')}
                             </div>
-                        `).join('')}
-                    </div>
-                `;
-                resultsContent.innerHTML += gamesHtml;
+                        </div>
+                    `;
 
-                resultsContent.classList.remove('hidden');
+                    let prizeInfo = `<div class="text-right"><p class="font-bold text-lg text-gray-800">${game.hits} Acertos</p></div>`;
+                    if (game.hits >= 11) {
+                         const prizeMessages = {
+                            15: '<span class="prize-badge prize-15">Parabéns! 15 Pontos!</span>',
+                            14: '<span class="prize-badge prize-14">Excelente! 14 Pontos!</span>',
+                            13: '<span class="prize-badge prize-13">Muito Bem! 13 Pontos!</span>',
+                            12: '<span class="prize-badge prize-12">Ótimo! 12 Pontos</span>',
+                            11: '<span class="prize-badge prize-11">Premiado! 11 Pontos</span>'
+                        };
+                        prizeInfo = `<div class="text-right"><p class="font-bold text-lg text-gray-800">${game.hits} Acertos</p>${prizeMessages[game.hits]}</div>`;
+                    }
+                    
+                    gameCard.innerHTML = gameInfo + prizeInfo;
+                    gamesList.appendChild(gameCard);
+                });
             }
+            checkedResultsContainer.appendChild(gamesList);
+        }
 
-            function showError(message) {
-                errorMessage.textContent = message;
-                error.classList.remove('hidden');
-            }
-        });
+
+        // Inicialização
+        initializeGeneratorGrid();
+        initializeCheckerGrid();
+        generateBtn.addEventListener('click', generateTickets);
+        checkBtn.addEventListener('click', checkGames);
     </script>
 </body>
 </html>
+
