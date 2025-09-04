@@ -160,6 +160,7 @@
                         Conferir Resultados
                     </button>
                     <div id="checked-results-container" class="mt-6"></div>
+                    <div id="stats-container" class="mt-8"></div>
                 </div>
             </section>
         </main>
@@ -184,6 +185,7 @@
         const checkerFeedback = document.getElementById('checker-feedback');
         const checkBtn = document.getElementById('check-btn');
         const checkedResultsContainer = document.getElementById('checked-results-container');
+        const statsContainer = document.getElementById('stats-container');
         
         let selectedNumbers = { fixed: [], excluded: [] };
 
@@ -239,6 +241,8 @@
             generateBtn.classList.add('opacity-50', 'cursor-not-allowed');
             checkerSection.classList.add('hidden');
             checkedResultsContainer.innerHTML = '';
+            statsContainer.innerHTML = '';
+
 
             try {
                 const response = await fetch(`${apiUrl}/api/generate`, {
@@ -327,6 +331,7 @@
 
             checked.sort((a, b) => b.hits - a.hits); // Ordena por acertos (decrescente)
             displayCheckedResults(checked);
+            displayStats(checked);
         }
 
         function displayCheckedResults(checkedGames) {
@@ -372,7 +377,46 @@
             }
             checkedResultsContainer.appendChild(gamesList);
         }
+        
+        function displayStats(checkedGames) {
+            const stats = {};
+            for (const game of checkedGames) {
+                stats[game.hits] = (stats[game.hits] || 0) + 1;
+            }
 
+            let tableHtml = `
+                <h3 class="text-xl font-semibold mb-4 text-gray-800">Estatísticas de Acertos</h3>
+                <div class="overflow-x-auto bg-white border border-gray-200 rounded-lg">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pontuação</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nº de Jogos</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+            `;
+
+            for (let i = 15; i >= 0; i--) {
+                const count = stats[i] || 0;
+                if (count > 0) { // Mostra apenas as faixas de acerto que ocorreram
+                    const isPrize = i >= 11;
+                    tableHtml += `
+                        <tr class="${isPrize ? 'bg-green-50' : ''}">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium ${isPrize ? 'text-green-800' : 'text-gray-900'}">${i} Pontos</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm ${isPrize ? 'text-green-700' : 'text-gray-500'}">${count} jogo(s)</td>
+                        </tr>
+                    `;
+                }
+            }
+
+            tableHtml += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            statsContainer.innerHTML = tableHtml;
+        }
 
         // Inicialização
         initializeGeneratorGrid();
