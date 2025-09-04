@@ -1,44 +1,46 @@
-\
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware # Importar o middleware de CORS
+from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional, Tuple, Dict
 import numpy as np
 import time, os, json, random, math
-from .schemas import GenerateRequest, GenerateResponse, Game, Mode, Objective, ProfileOut, FeedbackRequest, CalibrationStatus
-from .enigma.tail_optimizer import poisson_binomial_tail
-from .enigma.guardrails import violates_min_hamming, build_pair_counts, violates_pair_exposure, update_pair_counts
-from .enigma.calibration import calibrate as calib_apply, add_points as calib_add_points, status_counts as calib_status
+from app.schemas import GenerateRequest, GenerateResponse, Game, Mode, Objective, ProfileOut, FeedbackRequest, CalibrationStatus
+from app.enigma.tail_optimizer import poisson_binomial_tail
+from app.enigma.guardrails import violates_min_hamming, build_pair_counts, violates_pair_exposure, update_pair_counts
+# Importações do novo módulo de base de dados
+from app.enigma.database import init_db, get_calibration_model, save_calibration_model, get_thompson_posteriors, update_thompson_posterior, get_calibration_counts
 
-ENGINE_VERSION = "enigma-v1.3-calib-stress-auto"
+ENGINE_VERSION = "enigma-v1.4-db"
 SNAPSHOT_FILE = os.environ.get("ENIGMA_P_SNAPSHOT", "/app/sample/p_snapshot.json")
-CALIB_FILE = os.environ.get("ENIGMA_CALIB_FILE", "/app/state/calibration.json")
-AUTO_POSTERIORS_FILE = os.environ.get("ENIGMA_AUTO_POSTERIORS", "/app/state/strategy_posteriors.json")
 
 app = FastAPI(title="ENIGMA API", version=ENGINE_VERSION)
 
-# --- INÍCIO DA CORREÇÃO DE CORS ---
-# Adicionar o middleware de CORS à aplicação.
-# Isto permite que o seu painel_de_controlo.html (e outras páginas)
-# possam comunicar com o servidor da API.
+# --- CONFIGURAÇÃO DE CORS REFORÇADA ---
+# Lista de origens permitidas. Adicionamos o seu site do Netlify.
+# O "*" é um "wildcard" que permite testar a partir de qualquer origem.
 origins = [
     "http://localhost",
-    "http://localhost:8000",
-    "null", # Necessário para ficheiros abertos localmente (file://)
+    "http://localhost:8080",
+    "http://127.0.0.1:8000",
+    "https://celestial-heliotrope-650d98.netlify.app",
+    "*" 
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"], # Permite todos os métodos (GET, POST, etc.)
-    allow_headers=["*"], # Permite todos os cabeçalhos
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-# --- FIM DA CORREÇÃO DE CORS ---
+# --- FIM DA CONFIGURAÇÃO DE CORS ---
 
+
+@app.on_event("startup")
+def on_startup():
+    init_db() # Garante que a base de dados e as tabelas são criadas ao iniciar
 
 def load_probabilities() -> List[float]:
-    # Espera um vetor de 25 probabilidades cuja soma ≈ 15 (marginais para o próximo sorteio)
     try:
         with open(SNAPSHOT_FILE, "r") as f:
             p = json.load(f)
@@ -48,6 +50,27 @@ def load_probabilities() -> List[float]:
     except Exception:
         return [0.6]*25
 
+def calibrate(k: int, p: float) -> float:
+    model = get_calibration_model(k)
+    if not model:
+        return p
+    
+    xs = model.get("x", [])
+    gs = model.get("g", [])
+
+    if not xs:
+        return float(p)
+    
+    import bisect
+    idx = bisect.bisect_right(xs, p) - 1
+    if idx < 0:
+        return float(gs[0])
+    if idx >= len(gs):
+        return float(gs[-1])
+    return float(gs[idx])
+
+# As restantes funções (sample_candidate, greedy_tail_selection, etc.) permanecem as mesmas
+# ... (O restante código de main.py não precisa de ser alterado)
 def sample_candidate(p: List[float], k: int, fixed: Optional[List[int]] = None, excluded: Optional[List[int]] = None, rng: random.Random = None) -> List[int]:
     rng = rng or random
     fixed = fixed or []
@@ -205,13 +228,7 @@ def stress_eval_portfolio(games: List[List[int]], p: List[float], tail_k: int, s
     }
 
 def auto_pick_objective() -> Objective:
-    # Thompson Sampling over 3 braços: MEAN, TAIL@13, TAIL@14 utilizando posteriors Beta
-    # Recompensa deverá ser enviada via /api/feedback (1 se houve ≥k no período, 0 caso contrário)
-    try:
-        with open(AUTO_POSTERIORS_FILE, "r") as f:
-            post = json.load(f)
-    except Exception:
-        post = {"MEAN": [1,1], "TAIL13": [1,1], "TAIL14": [1,1]}
+    post = get_thompson_posteriors()
     draws = {}
     for arm, ab in post.items():
         a,b = ab
@@ -221,23 +238,7 @@ def auto_pick_objective() -> Objective:
         return "MEAN"
     if arm == "TAIL14":
         return "TAIL"
-    return "TAIL"  # default TAIL13
-
-def update_auto_posterior(arm: str, reward: int):
-    try:
-        with open(AUTO_POSTERIORS_FILE, "r") as f:
-            post = json.load(f)
-    except Exception:
-        post = {"MEAN": [1,1], "TAIL13": [1,1], "TAIL14": [1,1]}
-    a,b = post.get(arm, [1,1])
-    if reward == 1:
-        a += 1
-    else:
-        b += 1
-    post[arm] = [a,b]
-    os.makedirs(os.path.dirname(AUTO_POSTERIORS_FILE), exist_ok=True)
-    with open(AUTO_POSTERIORS_FILE, "w") as f:
-        json.dump(post, f, indent=2)
+    return "TAIL"
 
 @app.post("/api/generate", response_model=GenerateResponse)
 def generate(req: GenerateRequest):
@@ -257,10 +258,8 @@ def generate(req: GenerateRequest):
     tail_k = int(req.tail_target)
     K = int(req.quantity)
 
-    # AUTO mode chooses objective
     objective_used = req.objective
     if req.mode == "AUTO" and objective_used == "PARETO":
-        # In AUTO+PARETO, pick default profile based on Thompson arm
         objective_used = auto_pick_objective()
 
     run_id = f"eng-{int(time.time())}"
@@ -269,7 +268,7 @@ def generate(req: GenerateRequest):
     def attach_calibration(meta: Dict[str,float]) -> Dict[str,float]:
         out = dict(meta)
         if "p_success_ge_k" in meta and apply_conformal:
-            out["p_success_ge_k_calibrated"] = float(calib_apply(tail_k, float(meta["p_success_ge_k"])))
+            out["p_success_ge_k_calibrated"] = float(calibrate(tail_k, float(meta["p_success_ge_k"])))
         return out
 
     if objective_used == "MEAN":
@@ -351,17 +350,28 @@ def generate(req: GenerateRequest):
 
 @app.post("/api/feedback")
 def feedback(req: FeedbackRequest):
-    # Accepts observed outcomes to update calibration models (isotonic) for each k
+    from app.enigma.calibration import add_points as calib_add_points
     ks = {}
     for item in req.items:
         ks.setdefault(item.k, {"preds": [], "outs": []})
         ks[item.k]["preds"].append(float(item.predicted))
         ks[item.k]["outs"].append(int(item.outcome))
+    
+    objective_map = {13: "TAIL13", 14: "TAIL14"}
     for k, d in ks.items():
         calib_add_points(int(k), d["preds"], d["outs"])
+        
+        # Atualiza o posterior de Thompson
+        arm = objective_map.get(k)
+        if arm:
+            # Recompensa é 1 se pelo menos um resultado foi 1, senão 0
+            reward = 1 if any(out == 1 for out in d["outs"]) else 0
+            update_thompson_posterior(arm, reward)
+
     return {"status": "ok", "updated_ks": list(map(str, ks.keys()))}
+
 
 @app.get("/api/calibration/status", response_model=CalibrationStatus)
 def calibration_status():
-    return {"counts": {str(k): v for k,v in calib_status().items()}}
+    return {"counts": {str(k): v for k,v in get_calibration_counts().items()}}
 
